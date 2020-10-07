@@ -40,3 +40,5 @@ Deploy application
     cd "Base.Serverless.Api/src/Base.Serverless.Api"
     dotnet lambda deploy-serverless
 ```
+
+dotnet lambda deploy-serverless --profile default --region us-east-1 -sb s3-files-deploy-dev -sp sqs-sns-net-core -sn api-sqs-sns-net-core

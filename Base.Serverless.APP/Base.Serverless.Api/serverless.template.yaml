@@ -21,38 +21,84 @@ Parameters:
 Mappings:
   RoleLambda:
     RoleExec:
-      Adm: arn:aws:iam::924245329070:role/role-adm-lambda-projects
+      Adm: arn:aws:iam::AWS::AccountId:role/role-adm-lambda-projects
 
 Resources:
-  APIRest:
-    Type: AWS::Serverless::Api
-    Properties:
-      StageName: !Ref StageApiGateway
-      Name: base-serverless-net-core
 
-  Get:
+  GetFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: Base.Serverless.Api::Base.Serverless.Api.Handlers.FunctionExample::Get
-      FunctionName: get-coins-at-s3
+      Handler: Base.Serverless.Api::Base.Serverless.Api.Handlers.GenericSQSHandler::Get
+      FunctionName: sqs-tutorial-get-queue
       Role: !FindInMap [RoleLambda, RoleExec, Adm]
+      Environment:
+        Variables:
+          QueueArn: sqs-tutorial-net-core
       Events:
-        GetApi:
-          Type: Api
+        SQSGetEvent:
+          Type: SQS
           Properties:
-            Path: /coin
-            Method: GET            
-            RestApiId:
-              Ref: APIRest
+            Queue: !GetAtt SqsTutorialNetCore.Arn
+            BatchSize: 10
+            Enabled: true
+
+  PostFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: Base.Serverless.Api::Base.Serverless.Api.Handlers.GenericSQSHandler::Post
+      FunctionName: sqs-tutorial-post-queue
+      Role: !FindInMap [RoleLambda, RoleExec, Adm]
+      Environment:
+        Variables:
+          QueueArn: https://sqs.us-east-1.amazonaws.com/924245329070/sqs-tutorial-net-core
+      Events:
+        SQSGetEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt SqsTutorialNetCorePost.Arn
+            BatchSize: 10
+            Enabled: true
+
+  SqsTutorialNetCore:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: sqs-tutorial-net-core
+      MessageRetentionPeriod: 60
+      VisibilityTimeout: 12
+      RedrivePolicy:
+        maxReceiveCount: 3
+        deadLetterTargetArn: !GetAtt SqsDLQ.Arn
+
+  SqsTutorialNetCorePost:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: sqs-tutorial-net-core-post
+      MessageRetentionPeriod: 60
+      VisibilityTimeout: 12
+      RedrivePolicy:
+        maxReceiveCount: 3
+        deadLetterTargetArn: !GetAtt SqsDLQ.Arn
+
+  SqsDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: sqs-dlq-net-core
+      MessageRetentionPeriod: 1000
 
 Outputs:
-  Get:
-    Description: Function Get
-    Value: !Ref Get
-  ApiGateway:
-    Description: Api rest
-    Value: !Sub 
-      - https://${idApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${stage}/s3/
-      - idApiGateway: !Ref APIRest 
-        stage: !Ref StageApiGateway 
-  
+  SqsTutorialNetCoreOutput:
+    Description: queue tutorial
+    Value: !Ref SqsTutorialNetCore
+  SqsDLQOutput:
+    Description: queue tutorial dlq
+    Value: !Ref SqsDLQ
+  GetFunctionOutput:
+    Description: function to get in sqs
+    Value: !Ref GetFunction
+  SqsTutorialNetCorePostOutput:
+    Description: function to post in sqs
+    Value: !Ref SqsTutorialNetCorePost
+  PostFunctionOutput:
+    Description: function to post in sqs
+    Value: !Ref PostFunction
+    
